@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=bvyvkyspbqcqcsgdvzjp"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_ee95ebb21ac0a144f53e3e931c3ff013d8f13c74 "
+      },
+      "alwaysAllow": [
+        "list_tables",
+        "execute_sql",
+        "list_migrations"
+      ]
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\prada\\Documents\\Cline\\MCP\\sequentialthinking\\sequentialthinking\\build\\index.js"
+      ],
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
