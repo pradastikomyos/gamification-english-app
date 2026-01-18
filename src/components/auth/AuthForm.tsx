@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import mascotImage from '../../../maskot/maskot-baru/maskot-baru.png';
+import mascotImage from '../../../maskot/maskot.png';
 
 export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
