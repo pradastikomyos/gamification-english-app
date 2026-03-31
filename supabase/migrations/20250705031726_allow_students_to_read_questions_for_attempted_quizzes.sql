@@ -1,0 +1,1 @@
+﻿CREATE POLICY "Allow students to read questions for attempted quizzes" ON public.questions FOR SELECT USING (EXISTS (SELECT 1 FROM students s JOIN quiz_attempts qa ON s.id = qa.student_id WHERE s.user_id = auth.uid() AND qa.quiz_id = questions.quiz_id));

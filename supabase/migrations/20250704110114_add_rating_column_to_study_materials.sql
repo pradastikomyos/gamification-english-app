@@ -1,0 +1,1 @@
+﻿ALTER TABLE public.study_materials ADD COLUMN IF NOT EXISTS rating NUMERIC DEFAULT 0;

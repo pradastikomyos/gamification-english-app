@@ -1,0 +1,1 @@
+﻿CREATE POLICY "Allow students to read their own quiz attempts" ON public.quiz_attempts FOR SELECT USING (EXISTS (SELECT 1 FROM students WHERE students.id = quiz_attempts.student_id AND students.user_id = auth.uid()));
