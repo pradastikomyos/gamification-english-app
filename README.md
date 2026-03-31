@@ -1,4 +1,4 @@
-# 🎯 Loveable English Spark
+#  Loveable English Spark
 
 **Gamifikasi Pembelajaran Bahasa Inggris untuk SMK**
 
@@ -6,49 +6,49 @@ Platform pembelajaran interaktif yang dirancang khusus untuk meningkatkan kemamp
 
 ---
 
-## 🚀 **Fitur Utama**
+## **Fitur Utama**
 
-### 👨‍🏫 **Portal Guru (Teacher Portal)**
-- **📝 Quiz Management**: CRUD quiz dengan template visual menarik
-- **❓ Question Manager**: Manajemen soal per quiz dengan berbagai tingkat kesulitan
-- **👥 Students Management**: Manajemen siswa dengan sistem autentikasi terintegrasi
-- **📤 Quiz Assignment**: Assign quiz ke kelas dengan due date tracking
-- **📊 Dashboard & Reports**: Overview aktivitas dan performa siswa
-- **⚙️ Settings**: Konfigurasi akun dan notifikasi
+### **Portal Guru (Teacher Portal)**
+- **Quiz Management**: CRUD quiz dengan template visual menarik
+- **Question Manager**: Manajemen soal per quiz dengan berbagai tingkat kesulitan
+- **Students Management**: Manajemen siswa dengan sistem autentikasi terintegrasi
+- **Quiz Assignment**: Assign quiz ke kelas dengan due date tracking
+- **Dashboard & Reports**: Overview aktivitas dan performa siswa
+- **Settings**: Konfigurasi akun dan notifikasi
 
-### 👨‍🎓 **Portal Siswa (Student Portal)**
-- **🏠 Dashboard**: Overview personal dengan level, poin, dan streak
-- **📋 Assigned Quizzes**: Melihat quiz yang diberikan guru dengan status real-time
-- **🎮 Interactive Quiz Taking**: Interface quiz interaktif dengan timer
-- **📈 Quiz Results & Analytics**: Analisis performa dengan achievement system
-- **🏆 Leaderboard**: Ranking siswa berdasarkan poin dan level
-- **📚 Study Materials**: Library materi pembelajaran dengan progress tracking
-- **🎖️ Achievement System**: 8+ badges dengan level progression
+### **Portal Siswa (Student Portal)**
+- **Dashboard**: Overview personal dengan level, poin, dan streak
+- **Assigned Quizzes**: Melihat quiz yang diberikan guru dengan status real-time
+- **Interactive Quiz Taking**: Interface quiz interaktif dengan timer
+- **Quiz Results & Analytics**: Analisis performa dengan achievement system
+- **Leaderboard**: Ranking siswa berdasarkan poin dan level
+- **Study Materials**: Library materi pembelajaran dengan progress tracking
+- **Achievement System**: 8+ badges dengan level progression
 
 ---
 
-## 🎮 **Sistem Gamifikasi**
+## **Sistem Gamifikasi**
 
-### 🏅 **Point & Level System**
+### **Point & Level System**
 - **Points**: Diperoleh dari menyelesaikan quiz
 - **Levels**: Setiap 100 poin = level baru
 - **Streak**: Tracking engagement harian
 
-### 🏆 **Achievement Badges**
-- 🌟 **First Steps**: Quiz pertama
-- 🎯 **Quiz Master**: Menyelesaikan 10+ quiz
-- ⭐ **Perfect Score**: Nilai 100%
-- 🔥 **Streak Hero**: 7 hari berturut-turut
+### **Achievement Badges**
+- **First Steps**: Quiz pertama
+- **Quiz Master**: Menyelesaikan 10+ quiz
+- **Perfect Score**: Nilai 100%
+- **Streak Hero**: 7 hari berturut-turut
 - Dan masih banyak lagi...
 
-### 📊 **Leaderboard Competition**
+### **Leaderboard Competition**
 - Ranking kelas dan sekolah
 - Visual ranking dengan crown dan medals
 - Progress tracking untuk motivasi
 
 ---
 
-## 🛠️ **Tech Stack**
+##  **Tech Stack**
 
 ### **Frontend**
 - **React 18** dengan TypeScript
@@ -69,43 +69,43 @@ Platform pembelajaran interaktif yang dirancang khusus untuk meningkatkan kemamp
 
 ---
 
-## 📁 **Struktur Project**
+##  **Struktur Project**
 
 ```
 loveable-english-spark/
-├── src/
-│   ├── components/
-│   │   ├── teacher/           # Komponen portal guru
-│   │   │   ├── TeacherLayout.tsx
-│   │   │   ├── QuizManagement.tsx
-│   │   │   ├── QuestionManager.tsx
-│   │   │   ├── StudentsManagement.tsx
-│   │   │   ├── QuizAssignment.tsx
-│   │   │   └── Reports.tsx
-│   │   ├── student/           # Komponen portal siswa
-│   │   │   ├── StudentLayout.tsx
-│   │   │   ├── StudentDashboard.tsx
-│   │   │   ├── AssignedQuizzes.tsx
-│   │   │   ├── QuizTaking.tsx
-│   │   │   ├── QuizResults.tsx
-│   │   │   ├── Leaderboard.tsx
-│   │   │   └── StudyMaterials.tsx
-│   │   └── ui/                # UI components
-│   ├── pages/
-│   │   ├── TeacherPortal.tsx
-│   │   └── StudentPortal.tsx
-│   ├── hooks/
-│   ├── integrations/
-│   │   └── supabase/
-│   └── lib/
-├── supabase/                  # Database schema & migrations
-├── public/
-└── docs/
+ src/
+    components/
+       teacher/           # Komponen portal guru
+          TeacherLayout.tsx
+          QuizManagement.tsx
+          QuestionManager.tsx
+          StudentsManagement.tsx
+          QuizAssignment.tsx
+          Reports.tsx
+       student/           # Komponen portal siswa
+          StudentLayout.tsx
+          StudentDashboard.tsx
+          AssignedQuizzes.tsx
+          QuizTaking.tsx
+          QuizResults.tsx
+          Leaderboard.tsx
+          StudyMaterials.tsx
+       ui/                # UI components
+    pages/
+       TeacherPortal.tsx
+       StudentPortal.tsx
+    hooks/
+    integrations/
+       supabase/
+    lib/
+ supabase/                  # Database schema & migrations
+ public/
+ docs/
 ```
 
 ---
 
-## 🚀 **Installation & Setup**
+##  **Installation & Setup**
 
 ### **Prerequisites**
 - Node.js 18+ dan npm/yarn
@@ -148,7 +148,7 @@ http://localhost:5173
 
 ---
 
-## 🎯 **Demo Workflow**
+##  **Demo Workflow**
 
 ### **1. Setup Guru**
 ```bash
@@ -169,15 +169,15 @@ http://localhost:5173
 ```
 
 ### **4. Workflow Siswa**
-- Login → Dashboard
+- Login  Dashboard
 - Lihat assigned quizzes
-- Ambil quiz → interactive experience
-- Lihat hasil → achievement unlocked
+- Ambil quiz  interactive experience
+- Lihat hasil  achievement unlocked
 - Check leaderboard & study materials
 
 ---
 
-## 📊 **Database Schema**
+##  **Database Schema**
 
 ### **Main Tables**
 - `students` - Data siswa
@@ -195,7 +195,7 @@ http://localhost:5173
 
 ---
 
-## 🔒 **Security Features**
+##  **Security Features**
 
 - **Row Level Security (RLS)** pada semua tabel
 - **JWT Authentication** via Supabase
@@ -205,7 +205,7 @@ http://localhost:5173
 
 ---
 
-## 🎨 **UI/UX Highlights**
+##  **UI/UX Highlights**
 
 ### **Design System**
 - **Modern & Clean**: Menggunakan Tailwind + Shadcn/UI
@@ -221,7 +221,7 @@ http://localhost:5173
 
 ---
 
-## 🚀 **Production Deployment**
+##  **Production Deployment**
 
 ### **Recommended Platforms**
 - **Vercel** (Recommended untuk React)
@@ -245,7 +245,7 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ---
 
-## 📈 **Performance**
+##  **Performance**
 
 ### **Optimization**
 - **Code Splitting**: Route-based lazy loading
@@ -260,19 +260,19 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ---
 
-## 🧪 **Testing**
+##  **Testing**
 
 ### **Manual Testing Checklist**
-- ✅ Teacher create quiz → add questions
-- ✅ Teacher add student → student can login
-- ✅ Teacher assign quiz → student receives
-- ✅ Student take quiz → results tracked
-- ✅ Achievement system working
-- ✅ Leaderboard updates real-time
+-  Teacher create quiz  add questions
+-  Teacher add student  student can login
+-  Teacher assign quiz  student receives
+-  Student take quiz  results tracked
+-  Achievement system working
+-  Leaderboard updates real-time
 
 ---
 
-## 🤝 **Contributing**
+##  **Contributing**
 
 ### **Development Guidelines**
 1. **Fork** repository
@@ -289,42 +289,43 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ---
 
-## 📞 **Support**
+## **Support**
 
 ### **Documentation**
-- [DEMO_INSTRUCTIONS.md](./DEMO_INSTRUCTIONS.md) - Panduan demo
-- [CHANGELOG_MEMORY.md](./CHANGELOG_MEMORY.md) - History development
-- [TESTING_ASSIGNMENT_INTEGRATION.md](./TESTING_ASSIGNMENT_INTEGRATION.md) - Testing guide
+- [docs/README.md](./docs/README.md) - Documentation index
+- [docs/runbooks/DEMO_INSTRUCTIONS.md](./docs/runbooks/DEMO_INSTRUCTIONS.md) - Panduan demo
+- [docs/CHANGELOG.md](./docs/CHANGELOG.md) - History development
+- [docs/runbooks/TESTING_ASSIGNMENT_INTEGRATION.md](./docs/runbooks/TESTING_ASSIGNMENT_INTEGRATION.md) - Testing guide
 
 ### **Contact**
-- 📧 Email: support@loveable-english-spark.com
-- 🐛 Issues: [GitHub Issues](link-to-issues)
-- 💬 Discussions: [GitHub Discussions](link-to-discussions)
+- Email: support@loveable-english-spark.com
+- Issues: GitHub Issues page (set repository URL)
+- Discussions: GitHub Discussions page (set repository URL)
 
 ---
 
-## 📄 **License**
+## **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 
-## 🎉 **MVP Status: 100% COMPLETE!**
+## **MVP Status: 100% COMPLETE!**
 
-**🔥 GANBARIMASU ACHIEVED!** 
+**GANBARIMASU ACHIEVED!**
 
 Portal lengkap untuk guru dan siswa dengan sistem gamifikasi yang komprehensif. Siap untuk production deployment!
 
 ### **Core Features Complete:**
-- ✅ **Teacher Portal**: Quiz, Students, Assignment Management
-- ✅ **Student Portal**: Interactive Learning Experience
-- ✅ **Gamification**: Points, Levels, Achievements, Leaderboard
-- ✅ **Real-time Integration**: Live assignment tracking
-- ✅ **Modern UI/UX**: Responsive dan accessible
+- **Teacher Portal**: Quiz, Students, Assignment Management
+- **Student Portal**: Interactive Learning Experience
+- **Gamification**: Points, Levels, Achievements, Leaderboard
+- **Real-time Integration**: Live assignment tracking
+- **Modern UI/UX**: Responsive dan accessible
 
 ---
 
-**Made with ❤️ for SMK Students Learning English**
+**Made for SMK Students Learning English**
 
 <img width="939" height="433" alt="Screenshot_150" src="https://github.com/user-attachments/assets/b022f941-6283-4e68-9a14-de741bf28a72" />
 <img width="943" height="495" alt="Screenshot_1" src="https://github.com/user-attachments/assets/29abfbab-40f2-4585-beb1-3ac2c4a54cb3" />
@@ -355,5 +356,6 @@ Portal lengkap untuk guru dan siswa dengan sistem gamifikasi yang komprehensif. 
 <img width="948" height="525" alt="Screenshot_26" src="https://github.com/user-attachments/assets/3b5171af-4aff-49bd-9843-9d68e3fc20a2" />
 <img width="922" height="492" alt="Screenshot_27" src="https://github.com/user-attachments/assets/61b9ae73-677b-4044-a79d-5fb4e4f249ae" />
 <img width="888" height="485" alt="Screenshot_28" src="https://github.com/user-attachments/assets/eaf77d20-017c-4fd0-b890-87c7708c3099" />
+
 
 
