@@ -1,74 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Calendar } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useQuizReview } from '@/hooks/student/useQuizReview';
 
 interface QuizReviewProps {
   quizId: string;
   onBack: () => void;
 }
 
-interface ReviewResultBreakdownItem {
-  question_id: string;
-  question_text: string;
-  options: Record<string, string>;
-  student_answer: string;
-  correct_answer: string;
-  is_correct: boolean;
-  explanation?: string | null;
-}
-
-interface ReviewData {
-  quiz_title: string;
-  final_score: number;
-  base_score: number;
-  bonus_points: number;
-  time_taken_seconds: number;
-  submitted_at: string;
-  results_breakdown: ReviewResultBreakdownItem[];
-}
-
 export function QuizReview({ quizId, onBack }: QuizReviewProps) {
-  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: reviewData, isLoading: loading, error } = useQuizReview(quizId);
 
-  useEffect(() => {
-    if (quizId) {
-      fetchReviewData();
+  const errorMessage = useMemo(() => {
+    if (!error) {
+      return null;
     }
-  }, [quizId]);
 
-  const fetchReviewData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: rpcError } = await supabase.rpc('get_quiz_review_details', {
-        p_quiz_id: quizId,
-      });
-
-      if (rpcError) throw rpcError;
-
-      if (!data || data.length === 0) {
-        throw new Error('Data ulasan untuk kuis ini tidak ditemukan. Mungkin Anda belum mengerjakannya.');
-      }
-
-      setReviewData(data[0]);
-
-    } catch (error: any) {
-      console.error('Error fetching review data:', error);
-      setError(error.message || 'Terjadi kesalahan tidak diketahui');
-    } finally {
-      setLoading(false);
-    }
-  };
+    return error.message || 'Terjadi kesalahan tidak diketahui';
+  }, [error]);
 
   if (loading) return <div className="p-4 text-center">Memuat ulasan...</div>;
-  if (error) return (
+  if (errorMessage) return (
     <div className="p-4 max-w-4xl mx-auto">
        <Button onClick={onBack} variant="ghost" className="mb-4">
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -77,7 +32,7 @@ export function QuizReview({ quizId, onBack }: QuizReviewProps) {
       <Alert variant="destructive">
         <XCircle className="h-4 w-4" />
         <AlertTitle>Gagal Memuat Data</AlertTitle>
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>{errorMessage}</AlertDescription>
       </Alert>
     </div>
   );

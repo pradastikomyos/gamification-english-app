@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { useAssignedQuizzes } from '@/hooks/student/useAssignedQuizzes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,11 +44,11 @@ interface AssignedQuiz {
     time_limit: number;
     points_per_question: number;
     status: 'open' | 'closed';
-  };  completion?: {
+  };
+  completion?: {
     id: string;
     score: number;
     completed_at: string;
-
   };
 }
 
@@ -60,92 +60,14 @@ interface AssignedQuizzesProps {
 export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesProps) {
   const { profileId } = useAuth();
   const { toast } = useToast();
-  const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
-  useEffect(() => {
-    if (profileId) {
-      fetchAssignedQuizzes();
-    }
-  }, [profileId]);
-
-  const fetchAssignedQuizzes = async () => {
-    if (!profileId) return;
-
-    setLoading(true);
-    try {
-      // 1. Get student's class_id
-      const { data: studentData, error: studentError } = await supabase
-        .from('students')
-        .select('class_id')
-        .eq('id', profileId)
-        .single();
-
-      if (studentError || !studentData?.class_id) {
-        setAssignments([]);
-        return;
-      }
-      
-      const { class_id: classId } = studentData;
-
-      // 2. Get all quizzes assigned to the student's class
-      const { data: classQuizzesData, error: classQuizzesError } = await supabase
-        .from('class_quizzes')
-        .select('assignment_id:id, quiz_id, class_id, assigned_at, due_date, quiz:quizzes!inner(*)')
-        .eq('class_id', classId);
-
-      if (classQuizzesError || !classQuizzesData) {
-        setAssignments([]);
-        return;
-      }
-
-      // 3. Filter for valid assignments where 'quiz' is a single object, not an array or null.
-      const validAssignments = classQuizzesData.filter(
-        (a) => a.quiz != null && !Array.isArray(a.quiz)
-      );
-
-      if (validAssignments.length === 0) {
-        setAssignments([]);
-        return;
-      }
-
-      const assignedQuizIds = validAssignments.map(a => a.quiz_id);
-
-      const { data: attemptsData, error: attemptsError } = await supabase
-        .from('quiz_attempts')
-        .select('id, quiz_id, score:final_score, completed_at')
-        .eq('student_id', profileId)
-        .in('quiz_id', assignedQuizIds);
-
-      if (attemptsError) {
-        console.error('Error fetching quiz attempts:', attemptsError);
-      }
-
-      // 4. Merge data safely, using a double cast via 'unknown' as recommended by the TS error.
-      const mergedAssignments: AssignedQuiz[] = validAssignments.map(assignment => {
-        const completion = attemptsData?.find(c => c.quiz_id === assignment.quiz_id);
-        
-        return {
-          assignment_id: assignment.assignment_id,
-          quiz_id: assignment.quiz_id,
-          class_id: assignment.class_id,
-          assigned_at: assignment.assigned_at,
-          due_date: assignment.due_date,
-          // The filter at step 3 ensures `quiz` is a valid object. The double cast tells TypeScript to trust our runtime check.
-          quiz: assignment.quiz as unknown as AssignedQuiz['quiz'],
-          completion: completion || undefined,
-        };
-      });
-
-      setAssignments(mergedAssignments);
-
-    } catch (error: any) {
-      console.error('An unexpected error occurred:', error);
-      setAssignments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: assignments = [],
+    isLoading: loading,
+    isError,
+    error,
+    refetch,
+  } = useAssignedQuizzes(profileId);
 
   const getAssignmentStatus = (assignment: AssignedQuiz): 'pending' | 'completed' | 'overdue' => {
     if (assignment.completion) return 'completed';
@@ -204,10 +126,46 @@ export function AssignedQuizzes({ onStartQuiz, onReviewQuiz }: AssignedQuizzesPr
 
   if (loading) {
     return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-2 text-gray-600">Loading assigned quizzes...</p>
+      <div className="space-y-6 py-2">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-20" />
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-24" />
+          </div>
+        </div>
+        {Array.from({ length: 2 }).map((_, index) => (
+          <Card key={index} className="p-6 space-y-4">
+            <Skeleton className="h-6 w-64" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-10/12" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="flex justify-end">
+              <Skeleton className="h-10 w-36" />
+            </div>
+          </Card>
+        ))}
       </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="p-8 text-center space-y-4">
+        <h3 className="text-lg font-semibold text-red-700">Gagal memuat assigned quizzes</h3>
+        <p className="text-sm text-gray-600">{error?.message ?? 'Terjadi kesalahan tak terduga.'}</p>
+        <div>
+          <Button onClick={() => refetch()}>Coba lagi</Button>
+        </div>
+      </Card>
     );
   }
 

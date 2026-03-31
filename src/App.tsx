@@ -11,13 +11,25 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'; // Import routing components
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ForcePasswordChange from '@/pages/ForcePasswordChange';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 function AppContent() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, signOut } = useAuth();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   useEffect(() => {
@@ -65,6 +77,23 @@ function AppContent() {
         <Route path="/" element={<AuthForm />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    );
+  }
+
+  if (!loading && user && !role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50">
+        <div className="text-center max-w-md px-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Tidak dapat memuat profil pengguna</h2>
+          <p className="text-gray-600 mb-6">
+            Sesi login terdeteksi, tetapi data role/profile belum berhasil dipulihkan.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => window.location.reload()}>Coba Refresh</Button>
+            <Button variant="outline" onClick={() => void signOut()}>Sign Out</Button>
+          </div>
+        </div>
+      </div>
     );
   }
   

@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/lib/supabase';
+import { useQuizResults } from '@/hooks/student/useQuizResults';
+import { studentQueryKeys } from '@/hooks/student/queryKeys';
 import {
   Trophy,
   Target,
@@ -17,21 +20,6 @@ import {
   Flame,
   Gem
 } from 'lucide-react';
-
-interface QuizAttemptWithQuiz {
-  id: string;
-  quiz_id: string;
-  final_score: number;
-  base_score: number;
-  bonus_points: number;
-  time_taken_seconds: number | null;
-  completed_at: string;
-  answers: Record<string, string>;
-  quizzes: {
-    title: string;
-    total_questions: number;
-  }; // Reverted to object
-}
 
 interface QuizResultFormatted {
   id: string;
@@ -52,19 +40,13 @@ interface QuizResultFormatted {
   };
 }
 
-// Fix: handle quizzes as array if returned as array
-function getQuizMeta(quiz: any) {
-  if (Array.isArray(quiz)) {
-    return quiz[0] || { title: 'Unknown Quiz', total_questions: 0 };
-  }
-  return quiz || { title: 'Unknown Quiz', total_questions: 0 };
-}
-
 export function QuizResults() {
   const { profileId } = useAuth();
-  const [results, setResults] = useState<QuizResultFormatted[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const queryClient = useQueryClient();
+  const { data, isLoading: loading } = useQuizResults(profileId);
+
+  const results = (data?.results || []) as QuizResultFormatted[];
+  const stats = data?.stats || {
     totalQuizzes: 0,
     averageScore: 0,
     bestScore: 0,
@@ -73,14 +55,12 @@ export function QuizResults() {
     difficultyStats: {
       easy: { total: 0, correct: 0, percentage: 0 },
       medium: { total: 0, correct: 0, percentage: 0 },
-      hard: { total: 0, correct: 0, percentage: 0 }
-    }
-  });
+      hard: { total: 0, correct: 0, percentage: 0 },
+    },
+  };
 
   useEffect(() => {
     if (profileId) {
-      fetchResults();
-
       const channel = supabase
         .channel(`quiz_results:${profileId}`)
         .on(
@@ -93,8 +73,7 @@ export function QuizResults() {
           },
           (payload) => {
             console.log('New quiz result received!', payload);
-            // Re-fetch results to update the view
-            fetchResults();
+            queryClient.invalidateQueries({ queryKey: studentQueryKeys.quizResults(profileId) });
           }
         )
         .subscribe();
@@ -103,183 +82,7 @@ export function QuizResults() {
         supabase.removeChannel(channel);
       };
     }
-  }, [profileId]);
-
-  const fetchResults = async () => {
-    try {
-      setLoading(true);
-      
-      // The profileId from useAuth is the student's ID, so we use it directly.
-      const { data, error } = await supabase
-        .from('quiz_attempts')
-        .select(`
-          id,
-          quiz_id,
-          final_score,
-          base_score,
-          bonus_points,
-          time_taken_seconds,
-          completed_at,
-          answers,
-          quizzes!inner(title, total_questions)
-        `)
-        .eq('student_id', profileId)
-        .order('completed_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Calculate detailed breakdown for each result
-      const formattedResults = await Promise.all((data as any)?.map(async (result: any) => {
-        const quizMeta = getQuizMeta(result.quizzes);
-        // Get questions for this quiz to calculate detailed breakdown
-        const { data: questions, error: questionsError } = await supabase
-          .from('questions')
-          .select('id, difficulty, correct_answer, points')
-          .eq('quiz_id', result.quiz_id);
-
-        if (questionsError) {
-          console.error('Error fetching questions:', questionsError);
-          return {
-            ...result,
-            quiz_title: quizMeta.title,
-            total_questions: quizMeta.total_questions,
-            correct_answers: 0,
-            score_percentage: 0,
-            difficulty_breakdown: {
-              easy: { correct: 0, total: 0, points: 0 },
-              medium: { correct: 0, total: 0, points: 0 },
-              hard: { correct: 0, total: 0, points: 0 }
-            }
-          } as QuizResultFormatted;
-        }
-
-        // Calculate breakdown based on actual answers
-        const answers = result.answers as Record<string, string>;
-        let easyCorrect = 0, easyTotal = 0, easyPoints = 0;
-        let mediumCorrect = 0, mediumTotal = 0, mediumPoints = 0;
-        let hardCorrect = 0, hardTotal = 0, hardPoints = 0;
-        let totalCorrect = 0;
-
-        questions?.forEach(question => {
-          const studentAnswer = answers[question.id];
-          const isCorrect = studentAnswer === question.correct_answer;
-          
-          if (isCorrect) totalCorrect++;
-
-          switch (question.difficulty) {
-            case 'easy':
-              easyTotal++;
-              if (isCorrect) {
-                easyCorrect++;
-                easyPoints += question.points || 2;
-              }
-              break;
-            case 'medium':
-              mediumTotal++;
-              if (isCorrect) {
-                mediumCorrect++;
-                mediumPoints += question.points || 3;
-              }
-              break;
-            case 'hard':
-              hardTotal++;
-              if (isCorrect) {
-                hardCorrect++;
-                hardPoints += question.points || 5;
-              }
-              break;
-          }
-        });
-
-        return {
-          ...result,
-          quiz_title: quizMeta.title,
-          total_questions: quizMeta.total_questions,
-          correct_answers: totalCorrect,
-          score_percentage: quizMeta.total_questions ? Math.round((totalCorrect / quizMeta.total_questions) * 100) : 0,
-          difficulty_breakdown: {
-            easy: { correct: easyCorrect, total: easyTotal, points: easyPoints },
-            medium: { correct: mediumCorrect, total: mediumTotal, points: mediumPoints },
-            hard: { correct: hardCorrect, total: hardTotal, points: hardPoints }
-          }
-        } as QuizResultFormatted;
-      }) || []);
-
-      setResults(formattedResults);
-      calculateStats(formattedResults);
-    } catch (error: any) {
-      console.error('Error fetching quiz results:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStats = (results: QuizResultFormatted[]) => {
-    if (results.length === 0) {
-      setStats({ 
-        totalQuizzes: 0, 
-        averageScore: 0, 
-        bestScore: 0, 
-        totalTimeSpent: 0,
-        totalPointsEarned: 0,
-        difficultyStats: {
-          easy: { total: 0, correct: 0, percentage: 0 },
-          medium: { total: 0, correct: 0, percentage: 0 },
-          hard: { total: 0, correct: 0, percentage: 0 }
-        }
-      });
-      return;
-    }
-
-    const totalQuizzes = results.length;
-    
-    // Calculate average score based on correct answers percentage
-    const totalCorrectAnswers = results.reduce((sum, r) => sum + (r.correct_answers || 0), 0);
-    const totalQuestionsAnswered = results.reduce((sum, r) => sum + (r.total_questions || 0), 0);
-    const averageScore = totalQuestionsAnswered > 0 ? Math.round((totalCorrectAnswers / totalQuestionsAnswered) * 100) : 0;
-    
-    // Calculate best score
-    const bestScore = Math.max(...results.map(r => r.score_percentage || 0));
-    
-    const totalTimeSpent = results.reduce((sum, r) => sum + (r.time_taken_seconds || 0), 0);
-    const totalPointsEarned = results.reduce((sum, r) => sum + (r.final_score || 0), 0);
-
-    // Calculate difficulty stats
-    let easyTotal = 0, easyCorrect = 0;
-    let mediumTotal = 0, mediumCorrect = 0;
-    let hardTotal = 0, hardCorrect = 0;
-
-    results.forEach(result => {
-      if (result.difficulty_breakdown) {
-        easyTotal += result.difficulty_breakdown.easy.total;
-        easyCorrect += result.difficulty_breakdown.easy.correct;
-        mediumTotal += result.difficulty_breakdown.medium.total;
-        mediumCorrect += result.difficulty_breakdown.medium.correct;
-        hardTotal += result.difficulty_breakdown.hard.total;
-        hardCorrect += result.difficulty_breakdown.hard.correct;
-      }
-    });
-
-    const difficultyStats = {
-      easy: { 
-        total: easyTotal, 
-        correct: easyCorrect, 
-        percentage: easyTotal > 0 ? Math.round((easyCorrect / easyTotal) * 100) : 0 
-      },
-      medium: { 
-        total: mediumTotal, 
-        correct: mediumCorrect, 
-        percentage: mediumTotal > 0 ? Math.round((mediumCorrect / mediumTotal) * 100) : 0 
-      },
-      hard: { 
-        total: hardTotal, 
-        correct: hardCorrect, 
-        percentage: hardTotal > 0 ? Math.round((hardCorrect / hardTotal) * 100) : 0 
-      }
-    };
-
-    setStats({ totalQuizzes, averageScore, bestScore, totalTimeSpent, totalPointsEarned, difficultyStats });
-  };
+  }, [profileId, queryClient]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

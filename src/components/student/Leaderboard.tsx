@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,8 @@ import {
   List,
   TrendingUp
 } from 'lucide-react';
+import { useLeaderboard } from '@/hooks/student/useLeaderboard';
+import { studentQueryKeys } from '@/hooks/student/queryKeys';
 import {
   Table,
   TableBody,
@@ -55,23 +58,22 @@ interface LeaderboardStats {
 export function Leaderboard() {
   const { profileId, role: userRole, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardStudent[]>([]);
-  const [teacherViewData, setTeacherViewData] = useState<TeacherStudentView[]>([]);
-  const [stats, setStats] = useState<LeaderboardStats>({
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<'class' | 'school'>('school');
+
+  const { data, isLoading: loading, error } = useLeaderboard(profileId, userRole, view);
+
+  const leaderboardData = (data?.leaderboardData || []) as LeaderboardStudent[];
+  const teacherViewData = (data?.teacherViewData || []) as TeacherStudentView[];
+  const stats = data?.stats || {
     totalStudents: 0,
     currentUserRank: 0,
     averagePoints: 0,
     topScore: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'class' | 'school'>('school');
+  };
 
   useEffect(() => {
-    // If auth is finished and we have a profile, fetch the leaderboard data.
     if (!authLoading && profileId && userRole) {
-      fetchData();
-
-      // Set up real-time subscription for leaderboard updates
       const channel = supabase
         .channel('leaderboard_updates')
         .on(
@@ -83,8 +85,9 @@ export function Leaderboard() {
           },
           (payload) => {
             console.log('Student leaderboard data updated!', payload);
-            // Re-fetch leaderboard data
-            fetchData();
+            queryClient.invalidateQueries({
+              queryKey: studentQueryKeys.leaderboard(profileId, view, userRole),
+            });
           }
         )
         .subscribe();
@@ -92,96 +95,20 @@ export function Leaderboard() {
       return () => {
         supabase.removeChannel(channel);
       };
-    } 
-    // If auth is finished but there's no profile (e.g., not logged in, or error), 
-    // we should stop the loading spinner. The component will then render a message.
-    else if (!authLoading) {
-      setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, profileId, userRole, view]);
+  }, [authLoading, profileId, userRole, view, queryClient]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      if (userRole === 'teacher' || userRole === 'admin') {
-        const { data, error } = await supabase
-          .from('students')
-          .select('id, name, email, class:classes(name)')
-          .order('name', { ascending: true });
-
-        if (error) throw error;
-
-        const formattedData: TeacherStudentView[] = (data || []).map((student: any) => ({
-          ...student,
-          class: Array.isArray(student.class) ? student.class[0] : student.class,
-        }));
-        setTeacherViewData(formattedData);
-
-      } else if (userRole === 'student') {
-        let studentsData, studentsError;
-
-        if (view === 'class') {
-          // First, get the current student's class_id
-          const { data: currentUser, error: userError } = await supabase
-            .from('students')
-            .select('class_id')
-            .eq('id', profileId)
-            .single();
-
-          if (userError) throw userError;
-          if (!currentUser?.class_id) {
-            toast({
-              title: 'Not in a class',
-              description: 'You need to be in a class to see class rankings.',
-              variant: 'default',
-            });
-            setLeaderboardData([]);
-            setLoading(false);
-            return;
-          }
-
-          // Then, fetch the leaderboard for that specific class
-          ({ data: studentsData, error: studentsError } = await supabase.rpc('get_class_leaderboard', { p_class_id: currentUser.class_id }));
-
-        } else { // 'school' view
-          // Fetch the leaderboard for the entire school
-          ({ data: studentsData, error: studentsError } = await supabase.rpc('get_school_leaderboard'));
-        }
-
-        if (studentsError) throw studentsError;
-
-        console.log('Fetched students data:', studentsData);
-        console.log('Students data length:', studentsData?.length);
-
-        const rankedStudents: LeaderboardStudent[] = (studentsData || []).map((student: any, index) => ({
-          ...student,
-          rank: index + 1,
-          isCurrentUser: student.id === profileId,
-        }));
-        
-        console.log('Ranked students:', rankedStudents);
-        console.log('Setting leaderboard data with length:', rankedStudents.length);
-        
-        setLeaderboardData(rankedStudents);
-
-        const totalStudents = rankedStudents.length;
-        const currentUserRank = rankedStudents.find(s => s.isCurrentUser)?.rank || 0;
-        const averagePoints = totalStudents > 0 ? Math.round(rankedStudents.reduce((sum, s) => sum + s.total_points, 0) / totalStudents) : 0;
-        const topScore = rankedStudents.length > 0 ? rankedStudents[0].total_points : 0;
-        setStats({ totalStudents, currentUserRank, averagePoints, topScore });
-      }
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch data.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!error) {
+      return;
     }
-  };
+
+    toast({
+      title: 'Error',
+      description: error.message || 'Failed to fetch data.',
+      variant: 'destructive',
+    });
+  }, [error, toast]);
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="h-6 w-6 text-yellow-500" />;

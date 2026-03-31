@@ -1,24 +1,23 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, XCircle, Clock, Trophy } from 'lucide-react';
 import ImageZoom from '@/components/ui/image-zoom';
 import { DIFFICULTY_POINTS, calculateQuizScore, getTimeBonusTier } from '@/lib/gamification';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  ResultBreakdownItem,
+  StudentQuizQuestion,
+  useStudentQuizDetails,
+  useSubmitQuizAttempt,
+} from '@/hooks/student/useStudentQuiz';
 
 // Define types for our data
-interface Question {
-  id: string;
-  question_text: string;
-  media_url: string | null;
-  options: Record<string, string>;
-  difficulty: 'easy' | 'medium' | 'hard';
-  correct_answer: string;
-  explanation: string | null;
-}
+type Question = StudentQuizQuestion;
 
 interface Quiz {
     title: string;
@@ -30,66 +29,90 @@ interface QuizTakingProps {
   onFinishQuiz: () => void;
 }
 
-interface ResultBreakdownItem {
-  question_id: string;
-  question_text: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  student_answer: string;
-  correct_answer: string;
-  is_correct: boolean;
-}
-
 const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const { profileId } = useAuth();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: string]: string }>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
   const [quizResult, setQuizResult] = useState<{ final_score: number; base_score: number; bonus_points: number; results_breakdown: ResultBreakdownItem[] } | null>(null);
+  const {
+    data: quizData,
+    isLoading: isQuizLoading,
+    error: quizLoadError,
+    refetch: refetchQuiz,
+  } = useStudentQuizDetails(quizId);
+  const submitQuizAttempt = useSubmitQuizAttempt();
+  const isSubmitting = submitQuizAttempt.isPending;
+  const quiz: Quiz | null = quizData
+    ? { title: quizData.quiz_title, description: quizData.quiz_description }
+    : null;
+  const questions: Question[] = quizData?.questions || [];
 
   useEffect(() => {
-    const fetchQuizData = async () => {
-      if (!quizId) {
-        setError('Quiz ID is missing.');
-        setIsLoading(false);
-        return;
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers({});
+    setSubmitError(null);
+    setQuizResult(null);
+    setEndTime(null);
+
+    if (quizData) {
+      setTimeRemaining(quizData.time_limit_seconds || null);
+      setTimeLimit(quizData.time_limit_seconds || null);
+      setStartTime(new Date());
+    } else {
+      setTimeRemaining(null);
+      setTimeLimit(null);
+      setStartTime(null);
+    }
+  }, [quizId, quizData]);
+
+  const handleSubmit = useCallback(async () => {
+    if (isQuizLoading || isSubmitting || quizResult) return;
+
+    const submitEndTime = new Date();
+    setEndTime(submitEndTime);
+    setSubmitError(null);
+
+    try {
+      const timeTaken = startTime ? Math.round((submitEndTime.getTime() - startTime.getTime()) / 1000) : 0;
+      const result = await submitQuizAttempt.mutateAsync({
+        quizId,
+        studentAnswers: selectedAnswers,
+        timeTakenSeconds: timeTaken,
+        profileId,
+      });
+
+      if (result) {
+        setQuizResult(result);
+      } else {
+        onFinishQuiz();
       }
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase.rpc('get_quiz_details_for_student', {
-          p_quiz_id: quizId
-        });
-
-        if (error) throw error;
-        if (!data || data.length === 0) throw new Error('Quiz not found or has no questions.');
-
-        const quizDetails = data[0];
-        setQuiz({ title: quizDetails.quiz_title, description: quizDetails.quiz_description });
-        setQuestions(quizDetails.questions || []);
-        setTimeRemaining(quizDetails.time_limit_seconds || null);
-        setTimeLimit(quizDetails.time_limit_seconds || null);
-        setStartTime(new Date());
-
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchQuizData();
-  }, [quizId]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to submit quiz.';
+      setSubmitError(message);
+      console.error('Submission error:', err);
+    }
+  }, [
+    isQuizLoading,
+    isSubmitting,
+    quizResult,
+    startTime,
+    submitQuizAttempt,
+    quizId,
+    selectedAnswers,
+    profileId,
+    onFinishQuiz,
+  ]);
 
   useEffect(() => {
     if (timeRemaining === null || quizResult) return; // Stop timer if quiz is finished
 
     if (timeRemaining <= 0) {
-      if (!isLoading) {
+      if (!isQuizLoading && !isSubmitting) {
         handleSubmit();
       }
       return;
@@ -100,7 +123,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [timeRemaining, isLoading, quizResult]); // Add quizResult dependency
+  }, [timeRemaining, isQuizLoading, isSubmitting, quizResult, handleSubmit]);
 
   const handleAnswerChange = (questionId: string, optionId: string) => {
     setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
@@ -118,41 +141,7 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (isLoading || quizResult) return; // Prevent multiple submissions
-    setIsLoading(true);
-    setError(null);
-    
-    // Stop the timer by setting endTime
-    const submitEndTime = new Date();
-    setEndTime(submitEndTime);
-    
-    try {
-      const timeTaken = startTime ? Math.round((submitEndTime.getTime() - startTime.getTime()) / 1000) : 0;
-
-      const { data, error } = await supabase.rpc('submit_quiz_attempt', {
-        p_quiz_id: quizId,
-        p_student_answers: selectedAnswers,
-        p_time_taken_seconds: timeTaken,
-      });
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setQuizResult(data[0]);
-      } else {
-        // Fallback if RPC returns nothing
-        onFinishQuiz();
-      }
-    } catch (err: any) {
-      setError(err.message);
-      console.error('Submission error:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-    if (quizResult) {
+  if (quizResult) {
     // Use actual time taken from when quiz was submitted, not current time
     const actualTimeTaken = endTime && startTime ? Math.round((endTime.getTime() - startTime.getTime()) / 1000) : 0;
     
@@ -283,8 +272,54 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
     );
   }
 
-  if (isLoading) return <div className="p-4">Loading quiz...</div>;
-  if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+  if (isQuizLoading) {
+    return (
+      <div className="space-y-4 p-4 max-w-2xl mx-auto">
+        <Skeleton className="h-10 w-3/5" />
+        <Skeleton className="h-4 w-4/5" />
+        <Skeleton className="h-2 w-full" />
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (quizLoadError) {
+    return (
+      <Card className="m-4 max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-red-600">Tidak dapat memuat kuis</CardTitle>
+          <CardDescription>{quizLoadError.message}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Button onClick={() => refetchQuiz()}>Coba Lagi</Button>
+          <Button variant="outline" onClick={onFinishQuiz}>Kembali ke Daftar Kuis</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (submitError) {
+    return (
+      <Card className="m-4 max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-red-600">Gagal submit kuis</CardTitle>
+          <CardDescription>{submitError}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Button onClick={handleSubmit} disabled={isSubmitting}>Coba Submit Lagi</Button>
+          <Button variant="outline" onClick={onFinishQuiz}>Kembali ke Daftar Kuis</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!quiz || questions.length === 0) return <div className="p-4">Quiz not found or has no questions.</div>;
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -413,8 +448,8 @@ const QuizTaking = ({ quizId, onFinishQuiz }: QuizTakingProps) => {
           Previous
         </Button>
         {currentQuestionIndex === questions.length - 1 ? (
-          <Button onClick={handleSubmit} disabled={!selectedAnswers[currentQuestion.id] || isLoading}>
-            {isLoading ? 'Submitting...' : 'Submit Quiz'}
+          <Button onClick={handleSubmit} disabled={!selectedAnswers[currentQuestion.id] || isSubmitting}>
+            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
           </Button>
         ) : (
           <Button onClick={handleNext} disabled={!selectedAnswers[currentQuestion.id]}>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useStudentTour } from '@/hooks/useStudentTour';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { useStudentDashboard } from '@/hooks/student/useStudentDashboard';
+import { studentQueryKeys } from '@/hooks/student/queryKeys';
 import { 
   PlayCircle, 
   Trophy, 
@@ -49,10 +51,14 @@ interface StudentDashboardProps {
 }
 
 export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboardProps) {
-  const { user, profileId } = useAuth();
-  const { toast } = useToast();
+  const { profileId } = useAuth();
   const { initializeTour } = useStudentTour();
-  const [stats, setStats] = useState<DashboardStats>({
+  const queryClient = useQueryClient();
+  const [reviewingQuiz, setReviewingQuiz] = useState(null); // Add this state
+
+  const { data, isLoading: loading } = useStudentDashboard(profileId);
+
+  const stats: DashboardStats = data || {
     studentData: null,
     recentQuizzes: [],
     achievements: [],
@@ -60,15 +66,10 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
     assignedQuizzes: [],
     classRank: 0,
     totalClassmates: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [reviewingQuiz, setReviewingQuiz] = useState(null); // Add this state
+  };
 
   useEffect(() => {
     if (profileId) {
-      fetchDashboardData();
-
-      // Set up real-time subscription for student data updates
       const channel = supabase
         .channel(`student_dashboard:${profileId}`)
         .on(
@@ -81,8 +82,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
           },
           (payload) => {
             console.log('Student data updated!', payload);
-            // Re-fetch dashboard data
-            fetchDashboardData();
+            queryClient.invalidateQueries({ queryKey: studentQueryKeys.dashboard(profileId) });
           }
         )
         .on(
@@ -95,8 +95,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
           },
           (payload) => {
             console.log('Quiz progress updated!', payload);
-            // Re-fetch dashboard data
-            fetchDashboardData();
+            queryClient.invalidateQueries({ queryKey: studentQueryKeys.dashboard(profileId) });
           }
         )
         .subscribe();
@@ -105,7 +104,7 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
         supabase.removeChannel(channel);
       };
     }
-  }, [profileId]);
+  }, [profileId, queryClient]);
 
   // Initialize tour after dashboard data is loaded
   useEffect(() => {
@@ -113,138 +112,6 @@ export function StudentDashboard({ onStartQuiz, onReviewQuiz }: StudentDashboard
       initializeTour();
     }
   }, [loading, stats.studentData, initializeTour]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch student data
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('*, classes:class_id(name)')
-        .eq('id', profileId)
-        .single();
-
-      // Fetch recent quiz attempts
-      const { data: recentQuizzes } = await supabase
-        .from('quiz_attempts')
-        .select(`
-          *,
-          quizzes:quiz_id(title, difficulty)
-        `)
-        .eq('student_id', profileId)
-        .order('completed_at', { ascending: false })
-        .limit(5);
-
-      // Fetch available quizzes (only open quizzes that haven't been completed)
-      const { data: availableQuizzes } = await supabase
-        .from('class_quizzes')
-        .select(`
-          *,
-          quizzes:quiz_id!inner(*)
-        `)
-        .eq('class_id', studentData?.class_id)
-        .eq('quizzes.status', 'open')
-        .order('assigned_at', { ascending: false });
-
-      // Filter out completed quizzes from available quizzes
-      let filteredAvailableQuizzes = [];
-      if (availableQuizzes) {
-        const availableQuizIds = availableQuizzes.map(q => q.quiz_id);
-        const { data: completedAvailableQuizzes } = await supabase
-          .from('quiz_attempts')
-          .select('quiz_id')
-          .eq('student_id', profileId)
-          .in('quiz_id', availableQuizIds);
-
-        const completedAvailableQuizIds = completedAvailableQuizzes?.map(c => c.quiz_id) || [];
-        filteredAvailableQuizzes = availableQuizzes
-          .filter(quiz => !completedAvailableQuizIds.includes(quiz.quiz_id))
-          .slice(0, 3); // Limit to 3 after filtering
-      }
-
-      // Fetch assigned quizzes with completion status
-      const assignedQuizzesQuery = await supabase
-        .from('class_quizzes')
-        .select(`
-          id,
-          quiz_id,
-          assigned_at,
-          due_date,
-          quiz:quizzes!inner(
-            id,
-            title,
-            description,
-            difficulty,
-            time_limit
-          )
-        `)
-        .eq('class_id', studentData?.class_id)
-        .order('assigned_at', { ascending: false })
-        .limit(3);
-
-      const assignedQuizzes = assignedQuizzesQuery.data || [];
-
-      // Check completion status for assigned quizzes
-      const assignedQuizIds = assignedQuizzes.map(q => q.quiz_id);
-      const { data: completedQuizzes } = await supabase
-        .from('quiz_attempts')
-        .select('quiz_id')
-        .eq('student_id', profileId)
-        .in('quiz_id', assignedQuizIds);
-
-      const completedQuizIds = completedQuizzes?.map(c => c.quiz_id) || [];
-      const enrichedAssignedQuizzes = assignedQuizzes.map(quiz => ({
-        ...quiz,
-        completed: completedQuizIds.includes(quiz.quiz_id)
-      }));
-
-      // Fetch achievements
-      const { data: achievements } = await supabase
-        .from('user_achievements')
-        .select(`
-          *,
-          achievements:achievement_id(*)
-        `)
-        .eq('student_id', profileId)
-        .order('earned_at', { ascending: false })
-        .limit(3);
-
-      // Get class ranking
-      if (studentData?.class_id) {
-        const { data: classmates } = await supabase
-          .from('students')
-          .select('total_points')
-          .eq('class_id', studentData.class_id)
-          .order('total_points', { ascending: false });
-
-        const rank = classmates?.findIndex(s => s.total_points <= studentData.total_points) + 1 || 0;
-        setStats({
-          studentData,
-          recentQuizzes: recentQuizzes || [],
-          achievements: achievements || [],
-          availableQuizzes: filteredAvailableQuizzes || [],
-          assignedQuizzes: enrichedAssignedQuizzes || [],
-          classRank: rank,
-          totalClassmates: classmates?.length || 0,
-        });
-      } else {
-        setStats({
-          studentData,
-          recentQuizzes: recentQuizzes || [],
-          achievements: achievements || [],
-          availableQuizzes: filteredAvailableQuizzes || [],
-          assignedQuizzes: [],
-          classRank: 0,
-          totalClassmates: 0,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getNextLevelPoints = (currentLevel: number) => {
     return currentLevel * 100;

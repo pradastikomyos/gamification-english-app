@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 
-import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +24,7 @@ import {
   Zap,
   Target
 } from 'lucide-react';
+import { useStudyMaterials } from '@/hooks/student/useStudyMaterials';
 
 interface StudyMaterialsProps {
   onStartMaterial: (materialId: string) => void;
@@ -46,84 +46,32 @@ interface StudyMaterial {
 
 export function StudyMaterials({ onStartMaterial }: StudyMaterialsProps) {
   const { toast } = useToast();
+  const { data: materialsData, isLoading: loading, error } = useStudyMaterials();
   const [materials, setMaterials] = useState<StudyMaterial[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<StudyMaterial[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadStudyMaterials();
-  }, []);
+    setMaterials((materialsData || []) as StudyMaterial[]);
+  }, [materialsData]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    toast({
+      title: 'Error',
+      description: `Failed to load study materials: ${error.message}`,
+      variant: 'destructive',
+    });
+  }, [error, toast]);
 
   useEffect(() => {
     filterMaterials();
   }, [materials, searchTerm, selectedCategory, selectedDifficulty]);
-
-  const loadStudyMaterials = async () => {
-    try {
-      setLoading(true);
-      console.log('Loading study materials...');
-      
-      // Try RPC first
-      const { data: rpcData, error: rpcError } = await supabase.rpc('get_study_materials_with_status');
-
-      console.log('RPC Response:', { data: rpcData, error: rpcError });
-
-      if (rpcError) {
-        console.log('RPC failed, trying direct query...');
-        
-        // Fallback to direct query
-        const { data: directData, error: directError } = await supabase
-          .from('study_materials')
-          .select('id, title, description, type, category, difficulty, estimated_time, rating, created_at')
-          .order('created_at', { ascending: false });
-
-        console.log('Direct query response:', { data: directData, error: directError });
-
-        if (directError) {
-          throw directError;
-        }
-
-        if (directData) {
-          // Transform data to match expected format
-          const transformedData = directData.map(m => ({
-            ...m,
-            type: m.type || 'article',
-            status: 'not_started' as const,
-            rating: m.rating ? Number(m.rating) : 0
-          }));
-          console.log('Transformed materials:', transformedData);
-          setMaterials(transformedData);
-        } else {
-          setMaterials([]);
-        }
-      } else if (rpcData) {
-        // RPC succeeded
-        const materialsWithParsedRating = rpcData.map(m => ({
-          ...m, 
-          rating: m.rating ? Number(m.rating) : 0,
-          status: m.status || (m.is_completed ? 'completed' : 'not_started')
-        }));
-        console.log('Processed materials:', materialsWithParsedRating);
-        setMaterials(materialsWithParsedRating);
-      } else {
-        console.log('No data returned from RPC');
-        setMaterials([]);
-      }
-
-    } catch (error: any) {
-      console.error('Error loading materials:', error);
-      toast({
-        title: 'Error',
-        description: `Failed to load study materials: ${error.message}`,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filterMaterials = () => {
     let filtered = materials;

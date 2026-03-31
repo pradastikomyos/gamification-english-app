@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<'admin' | 'teacher' | 'student' | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const authRequestIdRef = useRef(0);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -40,12 +41,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [queryClient, navigate]);
 
   useEffect(() => {
-    const fetchUserProfile = async (user: User | null) => {
+    const fetchUserProfile = async (user: User | null, requestId: number) => {
+      const isStaleRequest = () => requestId !== authRequestIdRef.current;
+
       if (!user) {
-        setRole(null);
-        setProfileId(null);
+        if (!isStaleRequest()) {
+          setRole(null);
+          setProfileId(null);
+        }
         return;
       }
+
       try {
         // First, get the role from user_roles
         const { data: roleData, error: roleError } = await supabase
@@ -56,6 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (roleError) throw roleError;
         const userRole = roleData?.role as 'admin' | 'teacher' | 'student' || null;
+  if (isStaleRequest()) return;
         setRole(userRole);
 
         // If the user is a student, fetch their actual profile ID from the students table
@@ -66,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', user.id) // Find the student record using the auth user ID
             .single();
           if (studentError) throw studentError;
+          if (isStaleRequest()) return;
           setProfileId(studentData?.id || null);
         } else if (userRole === 'teacher') {
             const { data: teacherData, error: teacherError } = await supabase
@@ -74,26 +82,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', user.id)
             .single();
           if (teacherError) throw teacherError;
+          if (isStaleRequest()) return;
           setProfileId(teacherData?.id || null);
         } else {
-          setProfileId(null); // Admins or other roles might not have a profile ID
+          if (!isStaleRequest()) {
+            setProfileId(null); // Admins or other roles might not have a profile ID
+          }
         }
       } catch (error) {
         console.error("Error fetching user profile:", error);
-        setRole(null);
-        setProfileId(null);
+        if (!isStaleRequest()) {
+          setRole(null);
+          setProfileId(null);
+        }
+      }
+    };
+
+    const syncAuthState = async (session: Session | null) => {
+      const requestId = ++authRequestIdRef.current;
+      setLoading(true);
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      await fetchUserProfile(session?.user ?? null, requestId);
+
+      if (requestId === authRequestIdRef.current) {
+        setLoading(false);
       }
     };
 
     // onAuthStateChange fires immediately with the current session,
     // so it handles both initial load and subsequent changes.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      // Unblock the UI immediately once the session is known.
-      setLoading(false); 
-      // Fetch the user's profile and role in the background.
-      fetchUserProfile(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void syncAuthState(nextSession);
     });
 
     return () => {

@@ -46,12 +46,10 @@ export default function StudentPortal() {
         setQuizIdError(null);
       }
     } else {
-      if (takingQuiz) {
-        setSelectedQuizId(null);
-        setTakingQuiz(false);
-      }
+      setSelectedQuizId(null);
+      setTakingQuiz(false);
     }
-  }, [isMobile, quizIdParam, navigate, takingQuiz]);
+  }, [isMobile, quizIdParam, navigate]);
 
   const handleStartQuiz = (quizId: string) => {
     if (!quizId || quizId === 'undefined') {
@@ -127,7 +125,7 @@ export default function StudentPortal() {
         setSidebarOpen={setSidebarOpen}
         isTakingQuiz={true}
       >
-        <QuizTaking quizId={selectedQuizId} onFinishQuiz={handleFinishQuiz} />
+        <QuizTaking key={selectedQuizId} quizId={selectedQuizId} onFinishQuiz={handleFinishQuiz} />
       </StudentLayout>
     );
   }
@@ -139,7 +137,7 @@ export default function StudentPortal() {
       case 'assigned':
         return <AssignedQuizzes onStartQuiz={handleStartQuiz} onReviewQuiz={handleReviewQuiz} />;
       case 'quizTaking':
-        return <QuizTaking quizId={selectedQuizId!} onFinishQuiz={handleFinishQuiz} />;
+        return <QuizTaking key={selectedQuizId} quizId={selectedQuizId!} onFinishQuiz={handleFinishQuiz} />;
       case 'results':
         return <QuizResults />;
       case 'leaderboard':
